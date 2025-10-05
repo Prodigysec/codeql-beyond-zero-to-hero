@@ -1,0 +1,6 @@
+---
+name: class-pollution
+version: 0.0.0
+library: false
+dependencies:
+  codeql/python-all: "*"
