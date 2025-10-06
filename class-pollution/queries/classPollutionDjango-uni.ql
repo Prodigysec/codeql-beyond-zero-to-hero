@@ -106,6 +106,25 @@ predicate loopVarToSetattr(DataFlow::Node nodeFrom, DataFlow::Node nodeTo) {
 }
 
 /**
+ * Sanitizer: Django-Unicorn's dunder-check
+ * Detects the pattern:
+ *   for part in property_name_parts:
+ *       if part.startswith("__") and part.endswith("__"):
+ *           raise AssertionError(...)
+ */
+predicate isDunderCheckSanitized(DataFlow::Node node) {
+  exists(For f, If ifStmt, Raise raiseStmt, Call methodCall |
+    f.getIter() = node.asExpr() and
+    ifStmt.getParentNode() = f and
+    ifStmt.getTest().getASubExpression*() = methodCall and
+    methodCall.getFunc().(Attribute).getAttr() in ["startswith", "endswith"] and
+    methodCall.getArg(0).(StringLiteral).getText() = "__" and
+    raiseStmt.getParentNode*() = ifStmt  // transitive closure(*)  check if the raise statement is anywhere within the if statement's body
+  )
+}
+
+
+/**
  * Configuration for Django-Unicorn class pollution
  */
 module DjangoUnicornConfig implements DataFlow::ConfigSig {
@@ -127,6 +146,10 @@ module DjangoUnicornConfig implements DataFlow::ConfigSig {
     listToDirectLoop(nodeFrom, nodeTo)
     or
     loopVarToSetattr(nodeFrom, nodeTo)
+  }
+
+  predicate isBarrier(DataFlow::Node node) {
+    isDunderCheckSanitized(node)
   }
 }
 
