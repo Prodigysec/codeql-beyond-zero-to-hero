@@ -130,6 +130,26 @@ predicate callReceiverToResult(DataFlow::Node nodeFrom, DataFlow::Node nodeTo) {
   )
 }
 
+
+/**
+ * Sanitizer: Django-Unicorn's dunder-check
+ * Detects the pattern:
+ *   for part in property_name_parts:
+ *       if part.startswith("__") and part.endswith("__"):
+ *           raise AssertionError(...)
+ */
+predicate isDunderCheckSanitized(DataFlow::Node node) {
+  exists(For f, If ifStmt, Raise raiseStmt, Call methodCall |
+    f.getIter() = node.asExpr() and
+    ifStmt.getParentNode() = f and
+    ifStmt.getTest().getASubExpression*() = methodCall and
+    methodCall.getFunc().(Attribute).getAttr() in ["startswith", "endswith"] and
+    methodCall.getArg(0).(StringLiteral).getText() = "__" and
+    raiseStmt.getParentNode*() = ifStmt  // transitive closure(*)  check if the raise statement is anywhere within the if statement's body
+  )
+}
+
+
 /**
  * Configuration for class pollution detection
  */
@@ -153,21 +173,7 @@ module GeneralClassPollutionConfig implements DataFlow::ConfigSig {
   }
   
   predicate isBarrier(DataFlow::Node node) {
-    // Stop flow if validated against whitelist
-    exists(Compare cmp |
-      cmp.getASubExpression() = node.asExpr() and
-      cmp.getOp(0) instanceof In and
-      exists(List l | l = cmp.getASubExpression())
-    )
-    or
-    // Stop flow if explicitly validated
-    exists(Call c |
-      c.getFunc().(Name).getId() in [
-        "validate", "sanitize", "check_allowed", 
-        "verify", "is_valid", "is_safe"
-      ] and
-      c.getAnArg() = node.asExpr()
-    )
+    isDunderCheckSanitized(node)
   }
 }
 
