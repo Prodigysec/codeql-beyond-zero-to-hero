@@ -5,11 +5,13 @@
  * @kind path-problem
  * @id py/class-pollution
  * @problem.severity error
- * @precision low
+ * @precision medium
+ * 
  * Note: - This is a generalized query aimed at finding other variants of the CP vuln in docarray
  *       - Uses TaintTracking to track taint-preserving operations. ie: If A is tainted, B is tainted if it's "derived from" A, even through transformations.
  *        Eg: x.split('.') -> the list elements are tainted if x is tainted
  * Result: Yields 3 FP on docarray db
+ * TODO: Run against to 1000 repos and analyze results
 */
 
 import python
